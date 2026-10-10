@@ -77,6 +77,22 @@ with cli_events.EventRecorder(OUT) as rec:
     rec.mark("workflow_end", answer_chars=4200)
 
 Completions.create = TRUE_ORIGINAL
+
+# The recording is committed as a fixture and the recorder stamps the path it was
+# handed into its first event, so normalise it to repo-relative: regenerating the
+# file must not put a machine-specific directory back into the repository.
+import json
+
+with open(OUT, encoding="utf-8") as fh:
+    _lines = fh.read().splitlines(True)
+_head = json.loads(_lines[0])
+if isinstance(_head.get("data"), dict) and "path" in _head["data"]:
+    _repo = os.path.dirname(os.path.dirname(HERE))
+    _head["data"]["path"] = os.path.relpath(OUT, _repo).replace(os.sep, "/")
+    _lines[0] = json.dumps(_head, ensure_ascii=False) + "\n"
+with open(OUT, "w", encoding="utf-8", newline="") as fh:
+    fh.writelines(_lines)
+
 print("recorded ->", OUT)
 for name, n in cli_events.summarize(OUT)["counts"]:
     print(f"  {n:>4}  {name}")
