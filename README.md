@@ -88,6 +88,25 @@ and this `README.md`, and everything in the table is new. This is
 an independent Windows port; it is not a release by the upstream team, and the paper
 links, badges and the rest of this README belong to them.
 
+### Acknowledgements
+
+**Upstream.** The framework itself, every task implementation under `tasks/`, the
+`sci_tasks` / [ResearchClawBench](https://github.com/InternScience/ResearchClawBench)
+reproduction set and [MLEvolve](https://github.com/InternScience/MLEvolve) are the work of
+the [InternScience](https://github.com/InternScience) team — the Citation section at the
+bottom of this file lists the authors, and the
+[website](https://discovery.intern-ai.org.cn) / [HuggingFace collection](https://huggingface.co/collections/InternScience/internagent)
+for the project itself. This fork is not affiliated with them and is not endorsed by them;
+any bug in the port is ours.
+
+**This fork.** Maintained by [@leijunyu1216-collab](https://github.com/leijunyu1216-collab).
+Open an issue here if the Windows path breaks.
+
+**How it was built.** The Windows port, the CLI, the live display layer and the offline test
+suites were written jointly with an AI coding assistant (Qoder). Every commit here is authored
+and pushed under the maintainer's account, and the code was run and checked in a real terminal
+rather than generated unreviewed — but saying "one person wrote this" would not be accurate.
+
 ---
 
 ## 简体中文
@@ -215,6 +234,23 @@ key 只在你输入它的那个进程里，以环境变量发布：不进 `.env`
 逐条列在 `docs/cli.md`），另有 `.gitignore` 和本 `README.md`；表格里那一列全是新增。
 这是一个独立的 Windows 移植，不是上游团队的发布；论文链接、徽章和 README 的其余部分
 归他们所有。
+
+### 致谢
+
+**上游。** 框架本身、`tasks/` 下每一个任务实现、`sci_tasks` /
+[ResearchClawBench](https://github.com/InternScience/ResearchClawBench) 论文复现集，以及
+[MLEvolve](https://github.com/InternScience/MLEvolve)，都是
+[InternScience](https://github.com/InternScience) 团队的工作；作者名单见文末的 Citation
+一节，项目本身见[官网](https://discovery.intern-ai.org.cn)和
+[HuggingFace 合集](https://huggingface.co/collections/InternScience/internagent)。这个分支
+和上游没有隶属关系，也不是他们的官方发布——移植里出的 bug 都算这里的。
+
+**本分支。** 由 [@leijunyu1216-collab](https://github.com/leijunyu1216-collab) 维护，
+Windows 上跑不通欢迎直接开 issue。
+
+**是怎么做出来的。** Windows 移植、CLI、实时显示层和离线测试这一整套，是和 AI 编程助手
+（Qoder）一起写出来的。所有提交都以维护者的账号署名并推送，代码也在真终端里跑过、验过，
+但要说成「一个人独立写完的」就不准确了。
 
 ---
 
