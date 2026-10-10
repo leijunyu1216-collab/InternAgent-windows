@@ -4,6 +4,91 @@
 - **Links**: [Website](https://discovery.intern-ai.org.cn) | [HuggingFace](https://huggingface.co/collections/InternScience/internagent)
 
 
+---
+
+## Windows-native port, plus one terminal command
+
+Upstream [InternScience/InternAgent](https://github.com/InternScience/InternAgent) is a
+Linux project. Not in a philosophical way: every documented entry point is a POSIX
+shell script (`scripts/`: `run_qa.sh`, `run_discovery.sh`, `run_sci.sh`,
+`run_skip-idea.sh`, plus 119 more `.sh` files — a `launcher.sh` per task under
+`tasks/`), and `requirements.txt` carries 15 lines —
+`triton` and the `nvidia-*-cu12` wheels — that exist only because
+`torch` asks for them `platform_system == "Linux"`. There is no WSL2-free path in the
+upstream README.
+
+This repository is that same framework running on Windows itself — conda + pip, one
+Python — with a single terminal entry point added on top so you do not have to
+assemble a command line out of four scripts and a `.env`.
+
+### What this fork adds
+
+| | |
+| --- | --- |
+| `internagent_cli.py`, `cli_ui.py`, `cli_live.py`, `cli_events.py` | one command: a seven-step setup wizard, a live view of what every agent is reasoning, a multi-turn REPL, a dependency self-check. No new runtime dependency beyond `rich` + `prompt_toolkit`. |
+| `requirements-qa-windows.txt` | the slim set the deep-research chain actually imports on Windows. This is what the CLI was built and tested against. |
+| `requirements-discovery-windows.txt` | the full upstream list, minus those 15 Linux-only lines, with `onnxruntime` back to 1.20.1 (markitdown caps it on win32) and `tooluniverse` replaced by `PyMuPDF` — `tooluniverse` is imported by no file here, while the `import fitz` the code *does* reach lazily comes from PyMuPDF. |
+| 13 edits under `internagent/mas/` | the model layer accepts any OpenAI-compatible endpoint instead of a hard-coded name list, and several loops that could not stop (a planner retrying 401s forever, a tool re-issuing the identical call until the budget burned out). `internagent doctor` verifies each one is still in place after a pull. |
+| `tests/cli/` | 14 offline suites. The whole display layer — banner, live lanes, wizard widgets, redaction, the real `ExecutionAgent` loops — is checked without an API key and without a network. |
+| `docs/cli.md` | the wizard, the REPL commands, what the live display means, where keys can and cannot go, and the Windows terminal quirks worth not re-deriving. (Chinese.) |
+
+### Install and run
+
+```powershell
+conda create -n internagent python=3.11 -y
+conda activate internagent
+pip install -r requirements-qa-windows.txt
+pip install rich prompt_toolkit        # the CLI's own two dependencies
+python internagent_cli.py doctor       # encoding, deps, writable logs, the 13 patches
+python internagent_cli.py              # and the wizard starts
+```
+
+`doctor` is the thing to run first: it names the failing item rather than letting you
+discover it as a traceback. It also reports what is *not* installed — discovery mode
+needs `requirements-discovery-windows.txt`, and one experiment backend needs a
+separate `claude` CLI with its own auth.
+
+The wizard is the whole interface; nothing has to be memorised:
+
+```
+模型供应商  1/7
+   1  deepseek     官方端点 · V3 / R1，国内直连
+   2  qwen         阿里百炼 dashscope，国内直连
+   …
+  › ✓ 模型供应商  deepseek  官方端点 · V3 / R1，国内直连
+
+base_url  2/7
+  形如 https://host/v1；本机端点写 http://localhost:11434/v1
+  › [https://api.deepseek.com/v1] ✓ base_url  https://api.deepseek.com/v1
+```
+
+Arrow keys pick on a real Windows console; Git Bash gets the same list as numbers
+because an MSYS pty exposes no console buffer to read keys from — the same reason
+`prompt_toolkit` cannot attach there.
+
+### Keys never touch disk
+
+The key is typed into the process and published as an environment variable for that
+process only. Not in `.env`, not in `~/.internagent.json` (a whitelist filters what
+gets saved), never on the command line, where it would land in shell history and the
+process list — scripted runs pass `--api-key-env VAR` instead. Before anything reaches
+`logs/`, a `--record-events` JSONL, or the screen, `cli_events.redact()` strips
+`api_key:`/`secret=` assignments, bare `sk-…` strings and `Bearer …` tokens, *then*
+truncates, so a key straddling the cut cannot leave its first half behind. `doctor`
+greps your existing logs for those shapes and prints any hit already masked.
+
+### Provenance
+
+Based on `InternScience/InternAgent` at commit `fa8c3eedfa9751d3752ea6eb49220b303ac2397d`
+(2026-07-29), Apache License 2.0 — the `LICENSE` file here is upstream's, unmodified.
+Per §4(b), the notice above states what was changed: 8 files under `internagent/mas/`
+were edited (13 separate patches, itemised in `docs/cli.md`) along with `.gitignore`
+and this `README.md`, and everything in the table is new. This is
+an independent Windows port; it is not a release by the upstream team, and the paper
+links, badges and the rest of this README belong to them.
+
+---
+
 ## 🔥 News
 - **2026.5.07**: 🔥🔥 We have open-sourced InternAgent-1.5 with advanced features, including  enhanced algorithm discovery tasks, autonomous scientific paper reproduction, memory module, and deep research for tackling complex research challenges.
 
@@ -35,6 +120,32 @@ conda create -n InternAgent python=3.11
 conda activate InternAgent
 pip install -r requirements.txt
 ```
+
+> That is upstream's Linux path. On Windows, `requirements.txt` cannot install (the
+> `triton` / `nvidia-*` lines) — use [Install and run](#install-and-run) instead.
+
+### Command-line Assistant
+
+The wizard is described at the top ([Windows-native port](#windows-native-port-plus-one-terminal-command));
+this section is the non-interactive side — the same command, no prompts:
+
+```bash
+python internagent_cli.py            # or: internagent run
+python internagent_cli.py run "your research question" \
+  --provider deepseek --model deepseek-reason --api-key-env DEEPSEEK_API_KEY
+python internagent_cli.py doctor     # check deps, encoding, config, local patches, then:
+python tests/cli/run_all.py          # verify the whole display layer offline (no key, no network)
+```
+
+Passing the question on the command line skips the wizard entirely: every step
+resolves from a flag or from the saved config, and anything missing is reported
+by name instead of being asked halfway through. The key only comes from an
+environment variable — never from argv, where it would land in shell history and
+the process list.
+See [docs/cli.md](docs/cli.md) for the REPL commands, the environment knobs, the
+thirteen source edits this CLI depends on, and Windows terminal notes. The sections
+below cover the underlying launchers, which
+take configuration from `.env` and `config/` instead.
 
 ### Configure API Keys
 
