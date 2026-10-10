@@ -84,7 +84,9 @@ class Workflow(BaseAgent):
         )
         
         # 初始化用于查询分析的模型实例
-        self.analysis_model = get_model('o4-mini')
+        # Local patch: follow config model.default_model instead of a hardcoded
+        # 'o4-mini', which third-party OpenAI-compatible providers do not serve.
+        self.analysis_model = get_model(default_model)
     
     def _save_synthesizer_input(self, task: str, synthesizer_input: dict, task_id: str = None, timestamp: str = None):
         """
@@ -158,6 +160,15 @@ class Workflow(BaseAgent):
         
         self.global_planner.execute(task, file_path=file_path)
 
+        # Local patch: the planner now gives up — bad key, or plans that keep
+        # coming back with cycles or unrecognisable field names — with graph
+        # still None. This line used to die on `None.to_dict()` deep inside the
+        # worker thread, so the only thing the user saw was "workflow failed".
+        if self.global_planner.graph is None:
+            raise RuntimeError(
+                "全局规划没有产出可用的任务图：模型可能连续返回带环或字段名不对的计划，"
+                "或者调用一直失败。日志里 GlobalPlannerAgent 那一段能看到具体原因。")
+
         cur_graph = self.global_planner.graph.to_dict()
         logger.info(f"Planner_Graph: {cur_graph}")
 
@@ -208,6 +219,18 @@ class Workflow(BaseAgent):
                     final_answer = self.synthesizer_agent.execute(synthesizer_input)
                     logger.info(f"Final Answer for {task}: {final_answer}")
                     return final_answer
+                # Local patch: the layer cap used to be advisory. With no answer
+                # node in the graph the check fell straight through and the loop
+                # kept executing layers — and with enable_coordinator on (complex
+                # mode) the coordinator may add nodes, so get_ready_nodes() never
+                # emptied and every layer issued up to max_tool_calls tool calls
+                # per task agent, for as long as the process lived. Breaking here
+                # lands on get_final_answer() below, which reports what was
+                # researched so far instead of never returning.
+                logger.error(
+                    f"已超过最大执行层数 max_iter={max_execution_layers}，"
+                    f"且图中没有 answer 节点，停止执行并用已有结果收尾")
+                break
 
             if self.config.get('main', {}).get('enable_coordinator', False):
 

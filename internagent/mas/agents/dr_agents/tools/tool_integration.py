@@ -1516,7 +1516,9 @@ def extract_and_answer_query_from_url(url: str, query: str) -> Tuple[bool, str]:
     # Step 3: Ask LLM to answer query based on content
     try:
         from models import get_model
-        model = get_model("gpt-4o-mini")
+        # Local patch: honor EXTRACTION_MODEL instead of a hardcoded 'gpt-4o-mini',
+        # matching the convention in info_processing_tools.py.
+        model = get_model(os.getenv("EXTRACTION_MODEL", "gpt-4o-mini"))
 
         prompt = f"""Based on the following content extracted from a webpage, answer the question comprehensively.
 

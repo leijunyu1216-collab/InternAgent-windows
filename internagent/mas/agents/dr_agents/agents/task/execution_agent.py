@@ -1,6 +1,7 @@
 import sys
 import os
 import json
+import hashlib
 import re
 from typing import Any, Dict, List, Optional, Union
 
@@ -100,6 +101,9 @@ class ExecutionAgent(BaseAgent):
         self.max_tool_calls = self.config.get('max_tool_calls', 15)
         self.node_id = None  # 节点ID
         self.subtask_id = None  # 子任务ID
+        # Local patch: (tool, arguments) -> result for the subtask currently
+        # running. Replaced at the top of every execute() call.
+        self._tool_results = {}
         # 使用传入的reference_manager或创建新的
         self.reference_manager = reference_manager if reference_manager is not None else ReferenceManager()
         self.summarizer_model = summarizer_model or model  # 如果没有指定summarizer_model，使用默认model
@@ -295,6 +299,9 @@ class ExecutionAgent(BaseAgent):
             messages = [{"role": "user", "content": formatted_prompt}]
             tool_call_count = 0
             max_tool_calls = self.max_tool_calls  # 防止无限循环
+            # Local patch: one (tool, arguments) -> result cache per subtask;
+            # consumed by _execute_single_tool_call.
+            self._tool_results = {}
             
             while tool_call_count < max_tool_calls:
                 self._logger.info(f"执行工具调用循环 {tool_call_count + 1}/{max_tool_calls}")
@@ -385,7 +392,17 @@ class ExecutionAgent(BaseAgent):
                     # 注意：这里不需要else分支，因为如果result["tool_calls"]为空，就不会进入上面的if分支
                     
                     tool_call_count += 1
-                    
+
+                    # Local patch: a turn whose calls were all reuses of calls
+                    # this subtask already made cannot add anything to the
+                    # transcript — it is the model asking the same question
+                    # again because it has no new idea. Ending the loop here
+                    # saves the rest of the budget for the summary stage.
+                    if all(tc.get("replayed") for tc in result["tool_calls"]):
+                        self._logger.warning(
+                            "本轮工具调用与已执行过的完全重复，提前结束子任务")
+                        break
+
                     # 如果工具调用成功，继续循环
                     if any(tc.get("success", False) for tc in result["tool_calls"]):
                         # self._logger.info("工具调用成功，继续循环")    
@@ -552,7 +569,25 @@ class ExecutionAgent(BaseAgent):
         
         # 验证参数
         self._validate_tool_arguments(tool_config, arguments)
-        
+
+        # Local patch: an identical (tool, arguments) pair used to be re-issued
+        # on every turn of the tool loop, so a model that kept asking for the
+        # same search spent its whole budget hammering the same endpoint. The
+        # first result is reused instead; execute() ends the loop as soon as a
+        # turn holds nothing but reuses.
+        fingerprint = self._tool_call_fingerprint(tool_name, arguments)
+        if fingerprint in self._tool_results:
+            self._logger.warning(
+                f"工具 {tool_name} 已用相同参数调用过，复用上次结果")
+            return {
+                "tool_name": tool_name,
+                "success": True,
+                "arguments": arguments,
+                "result": self._tool_results[fingerprint],
+                "error": None,
+                "replayed": True,
+            }
+
         # 执行工具
         try:
             result = self._call_tool(tool_config, arguments)
@@ -566,7 +601,9 @@ class ExecutionAgent(BaseAgent):
                     self._logger.info(f"从工具 {tool_name} 中提取到 {len(extracted_urls)} 个URL")
                     # 使用修改后的result（包含tag信息）
                     result = modified_result
-            
+
+            self._tool_results[fingerprint] = result
+
             # 发送工具调用成功事件
             if self.node_id is not None and self.subtask_id is not None:
                 self.send_redis_event("get_subtask_process", {
@@ -595,6 +632,12 @@ class ExecutionAgent(BaseAgent):
                 "error": str(e)
             }
     
+    def _tool_call_fingerprint(self, tool_name: str, arguments: Any) -> str:
+        """Stable key for one (tool, arguments) pair, for the per-subtask cache."""
+        payload = json.dumps({"tool": tool_name, "arguments": arguments},
+                             sort_keys=True, ensure_ascii=False, default=str)
+        return hashlib.sha1(payload.encode("utf-8")).hexdigest()
+
     def _validate_tool_arguments(self, tool_config: Dict[str, Any], arguments: Dict[str, Any]) -> None:
         """
         验证工具参数
@@ -649,7 +692,13 @@ class ExecutionAgent(BaseAgent):
             return result
         except Exception as e:
             self._logger.error(f"Tool execution failed for {function_name}: {e}")
-            return f"Error executing {function_name}: {str(e)}"
+            # Local patch: this used to return "Error executing X: ..." as the
+            # tool's *result*. The caller records success from "the function
+            # returned", so a failing tool was logged as a successful call, the
+            # loop's "all calls failed, stop" branch became unreachable, and
+            # SPM's failed-call list stayed empty. Raising hands the error to
+            # _execute_single_tool_call, which already reports it as a failure.
+            raise
     
     def _generate_summary(self, results: List[Dict[str, Any]]) -> str:
         """

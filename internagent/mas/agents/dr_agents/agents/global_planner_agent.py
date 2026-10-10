@@ -250,11 +250,18 @@ class GlobalPlannerAgent(BaseAgent):
 
         max_iter = self.max_iter
 
-        graph = {
+        # Local patch: reset the graph this planner produced last time. In a
+        # multi-turn session the same agent object plans every question, so
+        # without this a failed plan left the previous question's graph in
+        # place and the workflow silently re-ran it.
+        self.graph = None
+
+        seed_graph = {
             "nodes":[
                 {"node_id":"task", "type":"answer", "task": input_data}
             ]
         }
+        graph = seed_graph
 
         if additional_info:
             self.logger.info(f"接收到文档信息，长度: {len(additional_info)}")
@@ -268,6 +275,14 @@ class GlobalPlannerAgent(BaseAgent):
         # SPM planner-side: 取一次 planning 先验（外部注入优先，否则从 agent_kb 检索），
         # 整个规划循环复用，避免每轮重复检索。
         memory_prompt = self.memory_prompt or self._retrieve_planner_memory(input_data)
+
+        # Local patch: this re-plan used to be uncapped, and it re-entered the
+        # loop with graph=None (build_graph_from_plan returns None for a cyclic
+        # plan), so the next pass described the current graph to the model as
+        # the literal string "null" — which produced plans even more likely to
+        # contain a cycle. A cyclic plan now gets a bounded number of retries
+        # and always restarts from the seed plan instead of from nothing.
+        replan_left = 2
 
         while True:  # 检查生成的图中是否存在环，如果存在环，则重新构建图
             idx = 1
@@ -306,12 +321,36 @@ class GlobalPlannerAgent(BaseAgent):
             
             # 构建图结构
             if response:
-                graph = self.build_graph_from_plan(graph)
-                if graph is None:
-                    self.logger.warning("global planner graph存在环，重新构建")
-                    continue
-                else:
+                try:
+                    built = self.build_graph_from_plan(graph)
+                except Exception as e:
+                    # build_graph_from_plan indexes node_id/task/type and
+                    # from/to/relationship directly, which a small model often
+                    # renames (`id`, `source`). That used to crash the run with
+                    # a bare KeyError; it now counts as another invalid plan.
+                    self.logger.warning(f"global planner 的计划无法建图: {e}")
+                    built = None
+                if built is not None:
                     break
+                if replan_left <= 0:
+                    self.logger.error(
+                        "global planner 连续生成带环的图，停止重规划")
+                    response = None
+                    break
+                replan_left -= 1
+                self.logger.warning("global planner graph存在环，重新构建")
+                graph = seed_graph
+                continue
+            else:
+                # Local patch: the inner `while idx <= max_iter` breaks with
+                # response=None once max_retries model calls all fail (e.g. a
+                # 401). Neither `continue` nor `break` below is reachable then,
+                # so the outer `while True` spun forever, re-issuing
+                # max_retries API calls per pass and making a bad key look
+                # like a hang instead of an error.
+                self.logger.error(
+                    f"Planner got no response after {max_iter} iterations; aborting planning loop")
+                break
 
         return response
     

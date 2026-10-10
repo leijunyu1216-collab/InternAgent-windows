@@ -116,12 +116,16 @@ class PlannerAgent(BaseAgent):
             # 如果模型调用失败，返回默认响应
             self._logger.error(f"模型调用失败: {e}")
             self._logger.warning("使用默认子任务响应")
-            return """<tasks>
-<task>分析任务需求并确定所需信息</task>
-<task>搜索相关信息和数据</task>
-<task>处理和验证信息</task>
-<task>生成最终答案</task>
-</tasks>"""
+            # Local patch: this fallback used to hand back 4 vague tasks no
+            # matter what max_subtasks said, so a dead endpoint produced more
+            # tool calls than a working one — and "搜索相关信息和数据" is
+            # exactly the goal that gets a small model re-running the same
+            # search until the budget runs out.
+            fallback = ["分析任务需求并确定所需信息", "搜索相关信息和数据",
+                        "处理和验证信息", "生成最终答案"]
+            picked = fallback[:max(1, int(self.max_subtasks))]
+            return "<tasks>\n" + "\n".join(
+                f"<task>{t}</task>" for t in picked) + "\n</tasks>"
     
     def get_prompt_template(self) -> str:
         """

@@ -186,5 +186,11 @@ class DRAgent(BaseAgent):
         except Exception as e:
             logger.error(f"Error during DR workflow execution: {str(e)}")
             # Return a fallback response instead of raising error
-            return f"Background research for: {task}\n\nNote: DR workflow execution failed. Please provide background context manually."
+            # Local patch: carry the real reason out of the except block. This
+            # string is what the caller (and the CLI) prints, and without it a
+            # planning failure, a bad key and a crashed tool all look exactly
+            # the same on screen. The marker text the CLI greps for is kept.
+            return (f"Background research for: {task}\n\n"
+                    f"Note: DR workflow execution failed: {str(e)}. "
+                    f"Please provide background context manually.")
 

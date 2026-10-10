@@ -1,3 +1,5 @@
+import os
+
 from .base_model import BaseModel
 from .deepseek import DeepSeekModel
 from .openai_model import OpenAIModel
@@ -29,6 +31,10 @@ def get_model(model_name: str, **kwargs) -> BaseModel:
         return InternS1Model(model_name, **kwargs)
     elif model_name.startswith("gemini"):
         return GeminiModel(model_name, **kwargs)
+    elif os.getenv("OPENAI_API_BASE_URL"):
+        # Local patch: route any OpenAI-compatible vendor (Kimi, GLM, ...)
+        # through the generic client instead of failing on an unknown prefix.
+        return OpenAIModel(model_name, **kwargs)
     else:
         raise ValueError(f"Unsupported model: {model_name}")
 
