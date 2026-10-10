@@ -1,0 +1,32 @@
+# InternAgent QA/deep-research mode — Windows-compatible slim dependency set.
+# Derived from internagent/mas/agents/dr_agents/requirements.txt with the
+# multimodal tools (paddleocr / opencv / playwright / pydub / scenedetect)
+# dropped: those are lazily imported and unused by the text research tools.
+python-dotenv==1.1.1
+loguru==0.7.3
+pydantic==2.11.7
+requests==2.32.4
+requests-oauthlib==2.0.0
+httpx==0.28.1
+openai==2.5.0
+anthropic==0.69.0
+pandas==2.3.3
+numpy==2.3.3
+json5
+pyyaml==6.0.2
+beautifulsoup4==4.13.4
+lxml==6.0.2
+aiohttp==3.12.15
+openpyxl==3.1.5
+python-dateutil==2.9.0.post0
+typing-extensions==4.14.1
+docstring-parser==0.17.0
+jsonschema==4.25.0
+colorama==0.4.6
+retry==0.9.2
+sqlalchemy==2.0.44
+mcp==1.18.0
+tiktoken==0.10.0
+astor
+xmltodict
+redis
