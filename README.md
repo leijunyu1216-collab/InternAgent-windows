@@ -146,6 +146,67 @@ key 只在你输入它的那个进程里，以环境变量发布：不进 `.env`
 `sk-…` 串和 `Bearer …` token，**然后**才截断，于是一把正好跨在截断点上的 key 不会只剩
 前半截留在外面。`doctor` 拿这些形状去 grep 你已有的日志，命中就按已脱敏的形式打出来。
 
+### 能跑哪些任务
+
+**算法发现任务**在 `tasks/` 下，这份代码里有 13 个目录（上游 News 说的「12 类任务」是
+2025.10 的口径）。上游说每个任务目录带 `prompt.json`、基线 `code/` 和 `launcher.sh`：
+实测 13 个都有 `prompt.json`，12 个有 `code/`，11 个有 `launcher.sh`——`AutoDebug`、
+`AutoDrug` 没有 launcher，`AutoDrug` 只有 `prompt.json` 一个文件；`tasks/` 下 14 个
+`launcher.sh` 里有 3 个是 `run_0/` 里跑完留下的副本。下表按各任务 `prompt.json` 里的
+`domain` 和 `task_description` 概述：
+
+| 任务 | 领域 | 要 agent 做的事 |
+| --- | --- | --- |
+| `AutoChem` | 化学反应产率预测 | 在 LLaMA 回归骨架上配 LoRA 与预测网络，输入是 SMILES 写的反应物/产物、反应类型（Suzuki–Miyaura 偶联）等结构化数据；训练集只有 60 条，特征抽取得稳 |
+| `AutoCls2D` | 图像分类 | 改进在 CIFAR-100 上训练的 2D 分类网络的模型设计 |
+| `AutoCls3D` | 点云分类 | 改进在 ModelNet 上训练的 3D 点云分类网络；难点是点云无序、不规则 |
+| `AutoClsSST` | 自然语言处理 | 改进在 SST-2 上做情感分类的网络设计 |
+| `AutoDebug` | 机器学习 | 上游推荐的第一个任务：不用下载数据集和权重，用来验证环境装好了没有；主题是「结构感知回归器」 |
+| `AutoDrug` | 催化剂设计 | 为碳捕集过程设计一种新的有机催化剂以提升 CO2 转化，用参考函数检索已有催化剂的 SMILES、生成结构变体、验证新颖性 |
+| `AutoEAP` | 基因组学 · 增强子活性预测 | 输入 DNA 序列（典型长度 200bp）预测增强子活性，重点在模型设计 |
+| `AutoMem` | agent 记忆系统 | 给对话式 AI agent 设计记忆系统，改进记忆的存储与检索，可借鉴 RAG 与人类的情景/语义记忆 |
+| `AutoMolecule3D` | 分子建模与性质预测 | 提出分子建模与性质预测方法，走几何深度学习路线，需在「分组表示」类方法的精度/开销权衡上做改进 |
+| `AutoPower` | 电力系统潮流估计 | 输入是电网图（母线分 PQ/PV/Slack，附带拓扑与量测量），提出潮流估计方法，可用图神经网络 |
+| `AutoTPPR` | 单细胞多组学扰动预测 | 建立生成式能量框架（GEARS），联合建模 scRNA-seq 与 scATAC-seq，预测转录组层面的扰动响应 |
+| `AutoTTRL` | 测试时强化学习 | 提出测试时 RL 框架，让 LLM 不做全量微调、只用有限算力和数据适配下游任务 |
+| `AutoTTS` | LLM 推理与测试时扩展 | 改进测试时扩展方法：推理框架设计、状态表示、计算效率；可参考 CoT / ToT / GoT 这类结构 |
+
+数据集与环境准备每个任务都不一样，上游的原话是「以各任务目录里的代码为准」。另注意
+`AutoTTS` 不是语音合成——它 `prompt.json` 里的 `domain` 写的是 LLM 推理与测试时扩展。
+
+**论文复现任务（`sci_tasks`）** 是另一种模式：交给 agent 一篇已发表论文和它用到的数据，
+让它自己写分析代码、跑起来、就着报错迭代、最后交一份报告。这部分内容不在本仓库里，而是
+一个指向 [ResearchClawBench](https://github.com/InternScience/ResearchClawBench) 的
+**submodule**（`git ls-files` 只会看到一个 gitlink），要 `git submodule update --init sci_tasks`
+才有东西；默认任务是 `Astronomy_000`。指南 [docs/sci_tasks.md](docs/sci_tasks.md) 是英文的。
+
+**四个开箱脚本**（`scripts/`，Linux 入口；Windows 上请用 `python internagent_cli.py`）：
+
+| 脚本 | 用途 |
+| --- | --- |
+| `run_discovery.sh` | 跑完整的发现流程（生成想法 → 做实验） |
+| `run_skip-idea.sh` | 跳过想法生成，从已有的想法文件直接开始做实验 |
+| `run_sci.sh` | 跑一个论文复现任务（默认 `Astronomy_000`） |
+| `run_qa.sh` | 用深度调研回答一个研究问题 |
+
+### 上游动态（中译）
+
+下面 7 条译自本文上方的 `## 🔥 News`，日期、链接和加重的位置都按原样保留；要引用请以英文原文为准。
+
+- **2026.5.07**：🔥🔥 开源 InternAgent-1.5，带来增强后的算法发现任务、科学论文自主复现、记忆模块，以及面向复杂科研难题的深度调研（deep research）等进阶能力。
+- **2026.3.17**：🚀🚀 对外开放 InternAgent 深度调研能力的[入口](https://scphub.intern-ai.org.cn/detail/28)，让开发者和研究者把这套深度调研功能接进自己的工作流。
+- **2026.2.14**：❤️‍🔥❤️‍🔥 开源 **[MLEvolve](https://github.com/InternScience/MLEvolve)**，即 InternAgent 中负责算法设计任务解优化的核心子系统实现。作为拿到 **MLEBench #1** 的**开源方法**，它展示的是在有界假设空间内的解优化能力。
+- **2026.2.10**：🔥 [InternAgent 1.5 技术报告](https://huggingface.co/papers/2602.08990) 正式发布。1.5 在 **GAIA、HLE、GPQA、FrontierScience** 等科学推理基准上取得领先表现，并支持横跨**物理、生物、地球科学与生命科学**的端到端自主科学发现任务——算法发现和实证发现（干/湿实验）都能做。
+- **2025.10.13**：InternAgent-1.0 代码全面开源，在 12 类科研任务上支持端到端自动化与自主演化。
+
+<details>
+<summary>更早两条……</summary>
+
+- **2025.07.17**：InternAgent 源代码部分开源。覆盖自主科研 12 类任务的完整版本即将开源。本仓库可用于全周期的自主科学研究，从假设生成一直到实验自动执行。
+- **2025.07.10**：*NovelSeek* 更名为 **InternAgent**。这个名字承载了我们对这套自主科研框架的期待——希望它能帮助所有研究者做出重大科学发现。
+
+</details>
+
 ### 来源
 
 基于 `InternScience/InternAgent` 的提交 `fa8c3eedfa9751d3752ea6eb49220b303ac2397d`
