@@ -102,11 +102,6 @@ any bug in the port is ours.
 **This fork.** Maintained by [@leijunyu1216-collab](https://github.com/leijunyu1216-collab).
 Open an issue here if the Windows path breaks.
 
-**How it was built.** The Windows port, the CLI, the live display layer and the offline test
-suites were written jointly with an AI coding assistant (Qoder). Every commit here is authored
-and pushed under the maintainer's account, and the code was run and checked in a real terminal
-rather than generated unreviewed — but saying "one person wrote this" would not be accurate.
-
 ---
 
 ## 简体中文
@@ -247,10 +242,6 @@ key 只在你输入它的那个进程里，以环境变量发布：不进 `.env`
 
 **本分支。** 由 [@leijunyu1216-collab](https://github.com/leijunyu1216-collab) 维护，
 Windows 上跑不通欢迎直接开 issue。
-
-**是怎么做出来的。** Windows 移植、CLI、实时显示层和离线测试这一整套，是和 AI 编程助手
-（Qoder）一起写出来的。所有提交都以维护者的账号署名并推送，代码也在真终端里跑过、验过，
-但要说成「一个人独立写完的」就不准确了。
 
 ---
 
