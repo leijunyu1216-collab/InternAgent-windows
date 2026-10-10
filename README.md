@@ -28,7 +28,7 @@ assemble a command line out of four scripts and a `.env`.
 | `internagent_cli.py`, `cli_ui.py`, `cli_live.py`, `cli_events.py` | one command: a seven-step setup wizard, a live view of what every agent is reasoning, a multi-turn REPL, a dependency self-check. No new runtime dependency beyond `rich` + `prompt_toolkit`. |
 | `requirements-qa-windows.txt` | the slim set the deep-research chain actually imports on Windows. This is what the CLI was built and tested against. |
 | `requirements-discovery-windows.txt` | the full upstream list, minus those 15 Linux-only lines, with `onnxruntime` back to 1.20.1 (markitdown caps it on win32) and `tooluniverse` replaced by `PyMuPDF` — `tooluniverse` is imported by no file here, while the `import fitz` the code *does* reach lazily comes from PyMuPDF. |
-| 13 edits under `internagent/mas/` | the model layer accepts any OpenAI-compatible endpoint instead of a hard-coded name list, and several loops that could not stop (a planner retrying 401s forever, a tool re-issuing the identical call until the budget burned out). `internagent doctor` verifies each one is still in place after a pull. |
+| 15 edits under `internagent/mas/` | the model layer accepts any OpenAI-compatible endpoint instead of a hard-coded name list, several loops that could not stop were given one (a planner retrying 401s forever, a tool re-issuing the identical call until the budget burned out), and all three deep-research configs ship with `volc_search` off since it needs a separate enterprise key. `internagent doctor` verifies each one is still in place after a pull. |
 | `tests/cli/` | 14 offline suites. The whole display layer — banner, live lanes, wizard widgets, redaction, the real `ExecutionAgent` loops — is checked without an API key and without a network. |
 | `docs/cli.md` | the wizard, the REPL commands, what the live display means, where keys can and cannot go, and the Windows terminal quirks worth not re-deriving. (Chinese.) |
 
@@ -39,7 +39,7 @@ conda create -n internagent python=3.11 -y
 conda activate internagent
 pip install -r requirements-qa-windows.txt
 pip install rich prompt_toolkit        # the CLI's own two dependencies
-python internagent_cli.py doctor       # encoding, deps, writable logs, the 13 patches
+python internagent_cli.py doctor       # encoding, deps, writable logs, the 15 patches
 python internagent_cli.py              # and the wizard starts
 ```
 
@@ -81,8 +81,8 @@ greps your existing logs for those shapes and prints any hit already masked.
 
 Based on `InternScience/InternAgent` at commit `fa8c3eedfa9751d3752ea6eb49220b303ac2397d`
 (2026-07-29), Apache License 2.0 — the `LICENSE` file here is upstream's, unmodified.
-Per §4(b), the notice above states what was changed: 8 files under `internagent/mas/`
-were edited (13 separate patches, itemised in `docs/cli.md`) along with `.gitignore`
+Per §4(b), the notice above states what was changed: 10 files under `internagent/mas/`
+were edited (15 separate patches, itemised in `docs/cli.md`) along with `.gitignore`
 and this `README.md`, and everything in the table is new. This is
 an independent Windows port; it is not a release by the upstream team, and the paper
 links, badges and the rest of this README belong to them.
@@ -143,7 +143,7 @@ by name instead of being asked halfway through. The key only comes from an
 environment variable — never from argv, where it would land in shell history and
 the process list.
 See [docs/cli.md](docs/cli.md) for the REPL commands, the environment knobs, the
-thirteen source edits this CLI depends on, and Windows terminal notes. The sections
+fifteen source edits this CLI depends on, and Windows terminal notes. The sections
 below cover the underlying launchers, which
 take configuration from `.env` and `config/` instead.
 

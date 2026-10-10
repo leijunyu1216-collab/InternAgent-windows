@@ -49,8 +49,9 @@ Windows 下同时放一个 `internagent.cmd`，Git Bash 只认无后缀那个。
 - **模型名打错会被当场纠出来**：`/models` 的返回里没有它时，列出端点真正提供的模型
   让你选（上百项时输入字母过滤），最后一项是 `仍然用 <你输入的名字>`，`Esc` 就是保留
   原输入——有些端点不老实报 `/models`，不能因此拦掉一次本来能跑的运行。
-- 模式那一步把三档的差别写在第二列（节点上限、是否逐节润色、谁还开着需要企业 key 的
-  `volc_search`），因为这个选择直接决定花多少钱。
+- 模式那一步把三档的差别写在第二列（节点上限、是否逐节润色、是否开 coordinator 修图），
+  因为这个选择直接决定花多少钱；列表下面那一行说明三种模式都已关掉需要企业 key 的
+  `volc_search`，剩下的 arxiv / openalex / crossref / url_processor 都不要 key。
 - 七步填完、初始化工作流之前有一张「准备开始」确认卡：供应商 / 模型 / 模式 / 预算 /
   单轮上限 / 附件。回车开始，`m` 换一个模型，`q` 退出——一轮深度调研是真金白银，而
   三个成本乘数很容易被忘掉。脚本化运行没有这一步（没人看着它）。
@@ -196,10 +197,11 @@ PYTHONIOENCODING=utf-8 D:/Anaconda/envs/internagent/python.exe tests/cli/run_all
 
 ## 本地补丁
 
-上游是 Deep Research 的参考实现，模型层和几个循环按论文作者的环境写死了。下面十三处
-在 `internagent/mas/` 下的**被跟踪文件**里，目前还没有提交，所以 `git pull` 冲突时可
-能被动摇，`git checkout .` 会直接抹掉。`doctor` 逐项查它们在不在（提示行里给出被抹掉
-后的后果，好认），每一处的形状如下：
+上游是 Deep Research 的参考实现，模型层和几个循环按论文作者的环境写死了。下面十五处都在
+`internagent/mas/` 下的**被跟踪文件**里，已经提交在这个 fork 的 `main` 上，但从上游
+`git pull` 时仍可能被动摇，`git checkout .` 会直接抹掉；`doctor` 逐项查它们在不在，
+提示行里给出被抹掉后的后果，好认。编号只到 13 条，是因为第 5 条按三份配置各算一处，
+而 `doctor` 按 15 项逐个查。每一处的形状如下：
 
 1. `models/__init__.py` — `get_model()` 原来只认 `deepseek*`/`gpt*`/`Qwen*`/
    `intern*`/`gemini*` 这些前缀，其它一律 `Unsupported model`。补一个兜底分支：设了
@@ -219,8 +221,10 @@ PYTHONIOENCODING=utf-8 D:/Anaconda/envs/internagent/python.exe tests/cli/run_all
    里已有的约定一致。
    少了它：`url_processor` 一被调用就要求一个第三方端点上通常不存在的模型名，表现为
    「检索到了网页但读不出内容」。
-5. `config_qa.yaml` 的 `volc_search` — 五处 enabled_tools 里把它注释掉。它是火山引擎
-   的企业搜索，需要单独的 `VOLC_SEARCH_API_KEY`。
+5. `config_qa.yaml` / `config_simple.yaml` / `config_complex.yaml` 的 `volc_search` —
+   每份五处 `enabled_tools`、合计 15 处都注释掉了。它是火山引擎的企业搜索，需要单独的
+   `VOLC_SEARCH_API_KEY`；关掉后剩下的四个（arxiv / openalex / crossref / url_processor）
+   都不需要 key，开箱能用。
    少了它：工具列表里挂着一个没有 key 的工具，模型选中它时那一轮就白跑。
 6. `agents/global_planner_agent.py` 的规划循环 — 内层 `while idx <= max_iter` 在
    `max_retries` 次调用全失败（例如 401）后带着 `response=None` 退出，此时下面的

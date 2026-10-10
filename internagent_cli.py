@@ -88,6 +88,12 @@ LOCAL_PATCHES = (
     (os.path.join(DR, "config_qa.yaml"),
      '# - "volc_search"',
      "启用了需要企业 key 的 volc_search 工具"),
+    (os.path.join(DR, "config_simple.yaml"),
+     '# - "volc_search"',
+     "启用了需要企业 key 的 volc_search 工具"),
+    (os.path.join(DR, "config_complex.yaml"),
+     '# - "volc_search"',
+     "启用了需要企业 key 的 volc_search 工具"),
     (os.path.join(DR, "agents", "global_planner_agent.py"),
      "# Local patch: the inner `while idx <= max_iter` breaks with",
      "key 无效时外层 while True 会无限重试（实测 4 分钟 5255 条 401）"),
@@ -1374,7 +1380,7 @@ def cmd_run(args):
                 default=(order.index(cfg["mode"])
                          if cfg.get("mode") in order else 0),
                 read_key=rk, ask=_ask_choice, sub=_sub(5),
-                note="qa 已关掉需要企业 key 的 volc_search，simple/complex 还开着它")
+                note="三种模式都已关掉需要企业 key 的 volc_search，其余检索工具不要 key")
             if quit_:
                 _wizard_cancel(console)
             mode = MODES[i][0]
