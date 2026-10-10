@@ -2,6 +2,7 @@
 > *Autonomous Discovery Across All Sciences*
 - **Papers**: [InternAgent 1.0](https://arxiv.org/abs/2505.16938) | [InternAgent 1.5](https://huggingface.co/papers/2602.08990)
 - **Links**: [Website](https://discovery.intern-ai.org.cn) | [HuggingFace](https://huggingface.co/collections/InternScience/internagent)
+- **Read in**: English (below) · [简体中文](#简体中文)
 
 
 ---
@@ -11,8 +12,8 @@
 Upstream [InternScience/InternAgent](https://github.com/InternScience/InternAgent) is a
 Linux project. Not in a philosophical way: every documented entry point is a POSIX
 shell script (`scripts/`: `run_qa.sh`, `run_discovery.sh`, `run_sci.sh`,
-`run_skip-idea.sh`, plus 119 more `.sh` files — a `launcher.sh` per task under
-`tasks/`), and `requirements.txt` carries 15 lines —
+`run_skip-idea.sh`, plus 119 more under `tasks/` and at the repo root — most tasks ship
+their own `launcher.sh`), and `requirements.txt` carries 15 lines —
 `triton` and the `nvidia-*-cu12` wheels — that exist only because
 `torch` asks for them `platform_system == "Linux"`. There is no WSL2-free path in the
 upstream README.
@@ -86,6 +87,73 @@ were edited (15 separate patches, itemised in `docs/cli.md`) along with `.gitign
 and this `README.md`, and everything in the table is new. This is
 an independent Windows port; it is not a release by the upstream team, and the paper
 links, badges and the rest of this README belong to them.
+
+---
+
+## 简体中文
+
+上游的说明全是英文，而这个 CLI 的界面是中文的。这一段把「和上游有什么不同、怎么装、
+怎么跑」单独讲一遍，细节在 [`docs/cli.md`](docs/cli.md)（也是中文）。
+
+### 为什么要这个分支
+
+上游 [InternScience/InternAgent](https://github.com/InternScience/InternAgent) 是 Linux 项目，
+而且是字面意义上的：文档里给出的每个入口都是 POSIX shell 脚本（`scripts/` 下 4 个，
+`tasks/` 和仓库根目录还有 119 个，多数任务自带一个 `launcher.sh`），`requirements.txt`
+里有 15 行是 `triton` 和 `nvidia-*-cu12`——它们只因 `torch` 在 `platform_system == "Linux"`
+时才被要。上游 README 没有给出不装 WSL2 的路线。
+
+这里跑的是同一套框架，但在 Windows 本机：一个 conda 环境、一个 Python、一条命令，
+不用 shell 脚本，也不用把配置拼进 `.env`。
+
+### 多了什么
+
+| | |
+| --- | --- |
+| `internagent_cli.py` `cli_ui.py` `cli_live.py` `cli_events.py` | 一条命令：七步配置向导、每个 agent 正在推什么的实时视图、多轮 REPL、依赖自检。除 `rich` + `prompt_toolkit` 外不引入新的运行依赖。 |
+| `requirements-qa-windows.txt` | 深度调研链路在 Windows 上真正会 import 的那部分依赖，CLI 就是照这套构建并测试的。 |
+| `requirements-discovery-windows.txt` | 上游完整清单去掉那 15 行 Linux-only，`onnxruntime` 回到 1.20.1（markitdown 在 win32 上有上限），`tooluniverse` 换成 `PyMuPDF`——本仓库没有文件 import `tooluniverse`，而代码懒加载时真正会碰到的 `import fitz` 来自 PyMuPDF。 |
+| `internagent/mas/` 下 10 个文件、15 处改动 | 模型层接受任意 OpenAI 兼容端点，而不是写死的模型名清单；几处原本停不下来的循环有了出口（规划器对 401 无限重试、同一个工具调用被原样重发直到预算烧完）；三份深度调研配置都把 `volc_search` 关掉了，它要单独的企业 key。`internagent doctor` 逐项检查它们在 `git pull` 之后是否还在位。 |
+| `tests/cli/` | 14 个离线套件：banner、实时分栏、向导控件、密钥脱敏、真实的 `ExecutionAgent` 循环，全都在没有 API key、不联网的条件下验过。 |
+| `docs/cli.md` | 向导、REPL 命令、实时界面每一栏的含义、key 能出现在哪里不能出现在哪里，以及不值得再踩一遍的 Windows 终端坑。 |
+
+### 安装与运行
+
+```powershell
+conda create -n internagent python=3.11 -y
+conda activate internagent
+pip install -r requirements-qa-windows.txt
+pip install rich prompt_toolkit        # CLI 自己的两个依赖
+python internagent_cli.py doctor       # 编码、依赖、logs 可写、15 处补丁
+python internagent_cli.py              # 直接进向导
+```
+
+`doctor` 要先跑：它会点名是哪一项不对，而不是让你从 traceback 里反推。它同时会说明哪些
+东西*没*装——discovery 模式还要 `requirements-discovery-windows.txt`，有一个实验后端需要
+单独的 `claude` CLI 及它自己的登录。
+
+七步依次是 **模型供应商 → base_url → 模型名 → API key → 运行模式 → 本地文件（可选）→
+研究问题**，标题右侧标着 `n/7`，界面实录见上文。真 Windows 控制台上用方向键选，Git Bash
+里同一份列表退成数字输入——MSYS 的 pty 不提供可读按键的 console buffer，`prompt_toolkit`
+在那里挂不上也是同一个原因。
+
+### key 不落盘
+
+key 只在你输入它的那个进程里，以环境变量发布：不进 `.env`，不进 `~/.internagent.json`
+（有一份白名单过滤落盘字段），也不出现在命令行上——那会落进 shell 历史和进程列表；
+脚本化运行改用 `--api-key-env VAR`。任何东西在写进 `logs/`、`--record-events` 的 JSONL
+或打到屏幕之前都要过 `cli_events.redact()`：先剥掉 `api_key:`/`secret=` 赋值、裸的
+`sk-…` 串和 `Bearer …` token，**然后**才截断，于是一把正好跨在截断点上的 key 不会只剩
+前半截留在外面。`doctor` 拿这些形状去 grep 你已有的日志，命中就按已脱敏的形式打出来。
+
+### 来源
+
+基于 `InternScience/InternAgent` 的提交 `fa8c3eedfa9751d3752ea6eb49220b303ac2397d`
+（2026-07-29），Apache License 2.0——这里的 `LICENSE` 是上游原件，未作改动。按 §4(b)
+的要求，上面的说明交代了改动范围：`internagent/mas/` 下 10 个文件被编辑（15 处补丁，
+逐条列在 `docs/cli.md`），另有 `.gitignore` 和本 `README.md`；表格里那一列全是新增。
+这是一个独立的 Windows 移植，不是上游团队的发布；论文链接、徽章和 README 的其余部分
+归他们所有。
 
 ---
 
